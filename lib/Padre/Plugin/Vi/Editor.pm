@@ -8,7 +8,7 @@ use List::Util ();
 use Padre::Wx  ();
 use Padre::Plugin::Vi::CommandLine;
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 sub new {
 	my ( $class, $editor ) = @_;
@@ -24,23 +24,29 @@ sub new {
 
 sub editor { return $_[0]->{editor} }
 
+# TODO:  Should i write the combinations as anonym function,
+#        if they are too long to suit in a line?
 $subs{CHAR} = {
 
 	# movements
-	l => \&move_right,
-	h => \&move_left,
-	k => \&line_up,
-	j => \&line_down,
-	w => \&word_right,
-	b => \&word_left,
+	l   => \&move_right,
+	h   => \&move_left,
+	k   => \&line_up,
+	j   => \&line_down,
+	w   => \&word_right,
+	b   => \&word_left,
+	e   => \&word_right_end,
+	' ' => \&move_right,
 
 	G => \&goto_line,
 
 	# selection
 	v => \&visual_mode,
-	### swictch to insert mode
+	### switch to insert mode
 	a => \&append_mode,
+	A => \&append_line_end,
 	i => \&insert_mode,
+	I => \&insert_at_first_non_blank,
 	o => \&open_below,
 	O => \&open_above,
 
@@ -55,13 +61,22 @@ $subs{CHAR} = {
 	dd   => \&delete_lines,
 	dw   => \&delete_words,
 	'd$' => \&delete_till_end_of_line,
+	'D'  => \&delete_till_end_of_line,
 	yy   => \&yank_lines,
 	yw   => \&yank_words,
 	'y$' => \&yank_till_end_of_line,
 
+	'c$' => \&change_till_end_of_line,
+	'C'  => \&change_till_end_of_line,
+	cw   => \&change_words,
+
 	ZZ  => \&save_and_quit,
-	'$' => \&goto_end_of_line,          # Shift-4 is $   End
-	'^' => \&goto_beginning_of_line,    # Shift-6 is ^   Home
+	'$' => \&goto_end_of_line,      # Shift-4 is $   End
+	'^' => \&goto_first_non_blank,
+	'0' => \&goto_beginning_of_line,
+
+	'{' => \&paragraph_up,
+	'}' => \&paragraph_down,
 };
 
 $subs{PLAIN} = {
@@ -73,7 +88,7 @@ $subs{PLAIN} = {
 	Wx::WXK_DOWN  => $subs{CHAR}{j},
 
 	Wx::WXK_PAGEUP => sub {
-		my ( $self, $count ) = @_;      # TODO use $count ??
+		my ( $self, $count ) = @_; # TODO use $count ??
 		if ( $self->{visual_mode} ) {
 			$self->{editor}->PageUpExtend;
 		} else {
@@ -81,7 +96,7 @@ $subs{PLAIN} = {
 		}
 	},
 	Wx::WXK_PAGEDOWN => sub {
-		my ( $self, $count ) = @_;      # TODO use $count ??
+		my ( $self, $count ) = @_; # TODO use $count ??
 		if ( $self->{visual_mode} ) {
 			$self->{editor}->PageDownExtend;
 		} else {
@@ -96,7 +111,7 @@ $subs{VISUAL} = {
 	d => \&delete_selection,
 	x => \&delete_selection,
 	y => \&yank_selection,
-	v => sub { },              # just end visual mode
+	v => sub { },           # just end visual mode
 };
 
 $subs{SHIFT} = {};
@@ -104,7 +119,7 @@ $subs{SHIFT} = {};
 # the following does not yet work as we need to neuralize the Ctrl-N of Padre
 # before we can see this command
 $subs{COMMAND} = {
-	ord('N') => sub {          # autocompletion
+	ord('N') => sub {       # autocompletion
 		print "Ctrl-N $_[0]\n";
 		my $main = Padre->ide->wx->main;
 		$main->on_autocompletition;
@@ -202,8 +217,9 @@ sub get_char {
 		$self->{buffer} = '';
 		return 0;
 	}
-	if (   $self->{buffer} =~ /^(\d*)([wblhjkvaioxupOJPG\$^])$/
-		or $self->{buffer} =~ /^(\d*)(ZZ|d[dw\$]|y[yw\$])$/ )
+	if (   $self->{buffer} =~ /^()(0)$/
+		or $self->{buffer} =~ /^(\d*)([wbelhjkvaAiIoxupOJPG\$^{}CD ])$/
+		or $self->{buffer} =~ /^(\d*)(ZZ|d[dw\$]|y[yw\$]|c[w\$])$/ )
 	{
 		my $count   = $1;
 		my $command = $2;
@@ -229,8 +245,8 @@ sub get_char {
 
 sub line_down {
 	my ( $self, $count ) = @_;
-	if ( $self->{visual_mode} ) {    # TODO moer than one lines
-		$self->{editor}->LineDownExtend;
+	if ( $self->{visual_mode} ) {
+		$self->{editor}->LineDownExtend for 1 .. $count;
 		return;
 	}
 
@@ -247,7 +263,7 @@ sub line_up {
 	my ( $self, $count ) = @_;
 
 	if ( $self->{visual_mode} ) {
-		$self->{editor}->LineUpExtend;
+		$self->{editor}->LineUpExtend for 1 .. $count;
 		return;
 	}
 
@@ -292,6 +308,28 @@ sub goto_beginning_of_line {
 	}
 }
 
+sub goto_first_non_blank {
+
+	# goto first non-blank char
+
+	# FIXME: may be the function name is too long :(
+
+	my ($self) = @_;
+	my $line   = $self->{editor}->GetCurrentLine;
+	my $text   = $self->{editor}->_get_line_by_number($line);
+
+	$text =~ /^(\s*)/;
+	my $offset = length($1) + 1;                          # + 1 for normal mode !
+	my $start  = $self->{editor}->PositionFromLine($line);
+
+	if ( $self->{visual_mode} ) {
+		$self->{editor}->HomeExtend;
+		$self->{editor}->CharRightExtend() for 1 .. $offset;
+	} else {
+		$self->{editor}->GotoPos( $start + $offset );
+	}
+}
+
 sub select_rows {
 	my ( $self, $count ) = @_;
 	my $line  = $self->{editor}->GetCurrentLine;
@@ -311,7 +349,7 @@ sub move_right {
 	#print "COUNT $count\n";
 	$self->{end_pressed} = 0;
 	if ( $self->{visual_mode} ) {
-		$self->{editor}->CharRightExtend();    # TODO use $count
+		$self->{editor}->CharRightExtend() for 1 .. $count;
 	} else {
 		my $pos = $self->{editor}->GetCurrentPos;
 		$self->{editor}->GotoPos( $pos + $count );
@@ -322,7 +360,7 @@ sub move_left {
 	my ( $self, $count ) = @_;
 	$self->{end_pressed} = 0;
 	if ( $self->{visual_mode} ) {
-		$self->{editor}->CharLeftExtend;       # TODO use $count
+		$self->{editor}->CharLeftExtend for 1 .. $count;
 	} else {
 		my $pos = $self->{editor}->GetCurrentPos;
 		$self->{editor}->GotoPos( List::Util::max( $pos - $count, 0 ) );
@@ -333,19 +371,26 @@ sub visual_mode {
 	my ( $self, $count ) = @_;
 	my $main = Padre->ide->wx->main;
 	$self->{editor}->text_selection_mark_start($main);
+	$self->{editor}->CharLeftExtend();
 	$self->{visual_mode} = 1;
 }
 
 # switch to insert mode
-sub append_mode {    # append
-	my ( $self, $count ) = @_;    # TODO use $count ??
+sub append_mode { # append
+	my ( $self, $count ) = @_; # TODO use $count ??
 	$self->{insert_mode} = 1;
 
 	# change cursor
 }
 
-sub insert_mode {                 # insert
-	my ( $self, $count ) = @_;    # use $count ?
+sub append_line_end {          # combination with $ and a
+	my ($self) = @_;           # do NOT use $count
+	$self->goto_end_of_line;
+	$self->{insert_mode} = 1;
+}
+
+sub insert_mode {              # insert
+	my ( $self, $count ) = @_; # use $count ?
 	$self->{insert_mode} = 1;
 	my $pos = $self->{editor}->GetCurrentPos;
 	$self->{editor}->GotoPos( $pos - 1 );
@@ -353,8 +398,15 @@ sub insert_mode {                 # insert
 	# change cursor
 }
 
+sub insert_at_first_non_blank {
+	my ($self) = @_;
+
+	$self->goto_first_non_blank;
+	$self->insert_mode;
+}
+
 sub open_below {
-	my ( $self, $count ) = @_;    # TODO use $count ??
+	my ( $self, $count ) = @_; # TODO use $count ??
 	$self->{insert_mode} = 1;
 	my $line = $self->{editor}->GetCurrentLine;
 	my $end  = $self->{editor}->GetLineEndPosition($line);
@@ -426,7 +478,7 @@ sub join_lines {
 }
 
 sub goto_line {
-	my ( $self, $count ) = @_;    # TODO: special case for count !!
+	my ( $self, $count ) = @_; # TODO: special case for count !!
 	$self->{editor}->GotoLine( $count - 1 );
 	$self->{buffer} = '';
 }
@@ -521,9 +573,62 @@ sub word_left {
 	$self->{editor}->WordLeft for 1 .. $count;
 }
 
+sub word_right_end {
+	my ( $self, $count ) = @_;
+	$self->{editor}->WordRightEnd for 1 .. $count;
+}
+
+sub paragraph_up {
+	my ( $self, $count ) = @_;
+
+	my $pos     = $self->{editor}->GetCurrentPos;
+	my $line_no = $self->{editor}->LineFromPosition($pos);
+
+	while ( $line_no-- > 0 && $count ) {
+		my $line = $self->{editor}->GetLine($line_no);
+		if ( $line =~ /^\s*$/ ) {
+			$count--;
+			last if $count < 1;
+		}
+	}
+	$self->{editor}->GotoLine($line_no);
+}
+
+sub paragraph_down {
+	my ( $self, $count ) = @_;
+
+	my $pos       = $self->{editor}->GetCurrentPos;
+	my $line_no   = $self->{editor}->LineFromPosition($pos);
+	my $num_lines = $self->{editor}->GetLineCount;
+
+	while ( $line_no++ < $num_lines && $count ) {
+		my $line = $self->{editor}->GetLine($line_no);
+		if ( $line =~ /^\s*$/ ) {
+			$count--;
+			last if $count < 1;
+		}
+	}
+	$self->{editor}->GotoLine($line_no);
+}
+
+sub change_words {
+	my ( $self, $count ) = @_;
+
+	$self->delete_words($count);
+	$self->{insert_mode} = 1;
+}
+
+sub change_till_end_of_line {
+	my ( $self, $count ) = @_;
+
+	$self->delete_till_end_of_line($count);
+	$self->{insert_mode} = 1;
+}
+
+
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2010 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

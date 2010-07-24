@@ -7,8 +7,9 @@ use base 'Padre::Plugin';
 
 use Scalar::Util qw(refaddr);
 use Padre::Util ('_T');
+use Padre::Constant ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 =head1 NAME
 
@@ -24,7 +25,7 @@ The 3 basic modes of vi are in development:
 When you turn on vi-mode, or load Padre with vi-mode already enabled
 you reach the normal navigation mode of vi.
 
-We don't plan to impelement many of the configuration options of vi. 
+We don't plan to implement many of the configuration options of vi. 
 Even parts that are going to be implemented will not use the same method
 of configuration.
 
@@ -136,7 +137,7 @@ Nyw - yank N words
 
 =item *
 
-u - undu last editing
+u - undo last editing
 
 =item *
 
@@ -154,7 +155,7 @@ G - jump to last line
 
 =item *
 
-w, Nw - next word, forwad N words
+w, Nw - next word, forward N words
 
 =item *
 
@@ -220,7 +221,7 @@ separate mapping of numbers to buffers and files.
 
 =head1 TODO
 
-Better indication that Padre is  in vi-mode.
+Better indication that Padre is in vi-mode.
 
 Change the cursor for navigation mode and back to insert mode.
 (fix i)
@@ -247,7 +248,7 @@ r for replacing current character
 =cut
 
 sub padre_interfaces {
-	'Padre::Plugin' => 0.18;
+	'Padre::Plugin' => 0.43;
 }
 
 sub plugin_enable {
@@ -307,7 +308,7 @@ sub about {
 	$about->SetCopyright( _T("Copyright 2008 Gabor Szabo") );
 
 	# Only Unix/GTK native about box supports websites
-	if (Padre::Util::WXGTK) {
+	if (Padre::Constant::WXGTK) {
 		$about->SetWebSite("http://padre.perlide.org/");
 	}
 
@@ -350,7 +351,7 @@ sub evt_char {
 
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2010 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

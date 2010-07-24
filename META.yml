@@ -4,11 +4,12 @@ author:
   - 'Gabor Szabo <szabgab@gmail.com>'
 build_requires:
   ExtUtils::MakeMaker: 6.42
+  Locale::Msgfmt: 0.14
   Test::More: 0.47
 configure_requires:
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.90'
+generated_by: 'Module::Install version 1.00'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -20,7 +21,7 @@ no_index:
     - share
     - t
 requires:
-  Padre: 0.25
+  Padre: 0.37
   Wx::Perl::Dialog: 0.04
   perl: 5.8.5
 resources:
@@ -28,4 +29,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre-Plugin-Vi
-version: 0.22
+version: 0.23

@@ -6,7 +6,7 @@ use Module::Install::Base;
 
 use vars qw{$VERSION @ISA};
 BEGIN {
-	$VERSION = '0.02';
+	$VERSION = '0.01';
 	@ISA     = qw{Module::Install::Base};
 }
 
@@ -66,12 +66,13 @@ sub install_padre_plugin {
     return;
   }
 
-  require Padre::Config::Constants;
+  require Padre;
+  my $plugin_dir = Padre::Config->default_plugin_dir;
 
   require File::Copy;
-  return File::Copy::copy($file, $Padre::Config::Constants::PADRE_PLUGIN_DIR);
+  return File::Copy::copy($file, $plugin_dir);
 }
 
 1;
 
-#line 142
+#line 143

@@ -6,7 +6,7 @@ use 5.008005;
 use base 'Exporter';
 our @EXPORT_OK = qw(clear_tab handle_tab set_original_cwd);
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 my @commands = qw(e w);
 my @current_options;
@@ -65,7 +65,7 @@ sub handle_tab {
 					# what shall we do here?
 					return;
 				}
-			} else {    # partial file or directory name
+			} else { # partial file or directory name
 				$dir    = File::Basename::dirname($path);
 				$prefix = File::Basename::basename($path);
 			}
@@ -81,7 +81,7 @@ sub handle_tab {
 		}
 	}
 
-	return if not @current_options;    # somehow alert the user?
+	return if not @current_options; # somehow alert the user?
 
 	my $option;
 	if ($shift) {
@@ -104,3 +104,8 @@ sub handle_tab {
 }
 
 1;
+
+# Copyright 2008-2010 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.
